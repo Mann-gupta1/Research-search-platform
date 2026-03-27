@@ -1,0 +1,15 @@
+node_modules/
+.nuxt/
+.output/
+dist/
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.db
+backend/data/
+*.tsv
+*.tsv.zip
+.DS_Store
+.pytest_cache/
+package-lock.json
