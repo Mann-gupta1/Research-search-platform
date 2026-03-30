@@ -52,6 +52,10 @@ class EmbeddingService:
         assert self._dim is not None
         return self._dim
 
+    @property
+    def is_ready(self) -> bool:
+        return self._model is not None
+
     def encode(self, texts: list[str], batch_size: int = 64) -> np.ndarray:
         m = self._ensure_model()
         embeddings = m.encode(
@@ -64,3 +68,7 @@ class EmbeddingService:
 
     def encode_query(self, query: str) -> np.ndarray:
         return self.encode([query])[0]
+
+    def warm(self) -> None:
+        """Load model into memory (for background warm-up on slow hosts)."""
+        self._ensure_model()

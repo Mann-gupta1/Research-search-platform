@@ -1,3 +1,6 @@
+import logging
+import os
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Response
@@ -9,10 +12,20 @@ from app.db.milvus_client import MilvusClient
 from app.db.metadata_store import MetadataStore
 from app.config import settings
 
+logger = logging.getLogger(__name__)
+
+
+def _warm_embedding(app: FastAPI) -> None:
+    try:
+        app.state.embedding_service.warm()
+        logger.info("Embedding model warm-up finished")
+    except Exception:
+        logger.exception("Embedding model warm-up failed; first /api/search may error")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Defer model load until first /api/search — avoids OOM + port-scan timeout on 512MB hosts
+    # Defer model load until warm-up thread or first /api/search — keeps port binding fast on Render
     app.state.embedding_service = EmbeddingService(
         settings.embedding_model, eager=False
     )
@@ -21,6 +34,13 @@ async def lifespan(app: FastAPI):
         settings.sqlite_db_path,
         database_url=settings.database_url,
     )
+    if os.getenv("WARM_EMBEDDING_ON_STARTUP", "1").lower() in ("1", "true", "yes"):
+        threading.Thread(
+            target=_warm_embedding,
+            args=(app,),
+            daemon=True,
+            name="embed-warmup",
+        ).start()
     yield
     app.state.milvus_client.close()
     app.state.metadata_store.close()
