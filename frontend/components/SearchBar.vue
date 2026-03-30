@@ -3,7 +3,11 @@ import type { SearchRequest } from "~/types";
 
 const props = defineProps<{
   loading: boolean;
+  /** When false, search is disabled (embedding model still loading on server). */
+  engineReady?: boolean;
 }>();
+
+const engineOk = computed(() => props.engineReady !== false);
 
 const emit = defineEmits<{
   search: [request: SearchRequest];
@@ -18,7 +22,7 @@ const minCitations = ref<string>("");
 const tagsInput = ref<string>("");
 
 const handleSubmit = () => {
-  if (!query.value.trim()) return;
+  if (!engineOk.value || !query.value.trim()) return;
 
   const parsedTags = tagsInput.value
     .split(",")
@@ -69,7 +73,7 @@ const handleSubmit = () => {
         </div>
         <button
           type="submit"
-          :disabled="loading || !query.trim()"
+          :disabled="loading || !query.trim() || !engineOk"
           class="px-6 py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
         >
           <svg
@@ -92,9 +96,12 @@ const handleSubmit = () => {
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
             />
           </svg>
-          {{ loading ? "Searching..." : "Search" }}
+          {{ loading ? "Searching..." : !engineOk ? "Preparing…" : "Search" }}
         </button>
       </div>
+      <p v-if="!engineOk" class="mt-2 text-sm text-amber-700">
+        Preparing the search engine — this avoids timeouts on first search.
+      </p>
 
       <!-- Doc type toggle + filter toggle -->
       <div class="mt-4 flex items-center justify-between">

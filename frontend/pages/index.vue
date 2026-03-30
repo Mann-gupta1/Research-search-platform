@@ -11,6 +11,11 @@ const apiLooksLocal = computed(() => {
 
 const { results, loading, error, search, reset } = useSearch();
 
+const { embeddingReady, warmupMessage, warmupError } = useEmbeddingWarmup(
+  apiBase,
+  apiLooksLocal,
+);
+
 const activeCluster = ref<number | null>(null);
 
 const filteredResults = computed(() => {
@@ -85,8 +90,25 @@ const handleClusterClick = (clusterId: number | null) => {
         </p>
       </div>
 
+      <div
+        v-if="warmupMessage"
+        class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-sm"
+      >
+        {{ warmupMessage }}
+      </div>
+      <div
+        v-if="warmupError"
+        class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm"
+      >
+        {{ warmupError }}
+      </div>
+
       <!-- Search Section -->
-      <SearchBar :loading="loading" @search="handleSearch" />
+      <SearchBar
+        :loading="loading"
+        :engine-ready="embeddingReady"
+        @search="handleSearch"
+      />
 
       <!-- Error -->
       <div
