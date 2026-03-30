@@ -74,6 +74,7 @@ async def root():
         "service": "research-search-platform",
         "health": "/api/health",
         "ready": "/api/ready",
+        "warm": "POST /api/warm (load model in background; then poll /api/ready)",
         "search": "POST /api/search",
         "docs": "/docs",
         "note": "First search may take 1–3 min on cold start; use POST with JSON or upgrade RAM.",
