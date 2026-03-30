@@ -1,5 +1,29 @@
 import type { SearchRequest, SearchResponse } from "~/types";
 
+/** Render cold start + first embedding load can exceed 60s */
+const SEARCH_TIMEOUT_MS = 180_000;
+
+function formatSearchError(e: unknown, apiBase: string): string {
+  if (e && typeof e === "object" && "data" in e) {
+    const d = (e as { data?: unknown; message?: string }).data;
+    if (d && typeof d === "object" && "detail" in d) {
+      const det = (d as { detail: unknown }).detail;
+      if (typeof det === "string") return det;
+      if (Array.isArray(det))
+        return det.map((x) => JSON.stringify(x)).join("; ");
+    }
+    const m = (e as { message?: string }).message;
+    if (m) return m;
+  }
+  if (e instanceof Error) {
+    if (e.message.includes("Failed to fetch") || e.name === "FetchError") {
+      return `Cannot reach API at ${apiBase}. On Netlify set NUXT_PUBLIC_API_BASE to your Render URL (https://...) and redeploy.`;
+    }
+    return e.message;
+  }
+  return "Search failed";
+}
+
 export const useSearch = () => {
   const config = useRuntimeConfig();
   const apiBase = config.public.apiBase;
@@ -28,12 +52,12 @@ export const useSearch = () => {
       const data = await $fetch<SearchResponse>(`${apiBase}/api/search`, {
         method: "POST",
         body,
+        timeout: SEARCH_TIMEOUT_MS,
       });
 
       results.value = data;
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Search failed";
-      error.value = msg;
+      error.value = formatSearchError(e, apiBase);
       console.error("Search error:", e);
     } finally {
       loading.value = false;

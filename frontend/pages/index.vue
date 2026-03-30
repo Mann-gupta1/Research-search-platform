@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import type { SearchRequest } from "~/types";
 
+const config = useRuntimeConfig();
+const apiBase = computed(() => String(config.public.apiBase || ""));
+
+const apiLooksLocal = computed(() => {
+  const b = apiBase.value.toLowerCase();
+  return b.includes("localhost") || b.includes("127.0.0.1");
+});
+
 const { results, loading, error, search, reset } = useSearch();
 
 const activeCluster = ref<number | null>(null);
@@ -60,6 +68,23 @@ const handleClusterClick = (clusterId: number | null) => {
     </header>
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <!-- Misconfigured production API (Netlify build missing env) -->
+      <div
+        v-if="apiLooksLocal"
+        class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-sm"
+      >
+        <p class="font-medium">API URL is still set to localhost</p>
+        <p class="mt-1">
+          In Netlify → Site settings → Environment variables, set
+          <code class="bg-amber-100 px-1 rounded">NUXT_PUBLIC_API_BASE</code>
+          to your Render backend (e.g.
+          <code class="bg-amber-100 px-1 rounded"
+            >https://research-search-platform.onrender.com</code
+          >), then trigger a new deploy. Current value:
+          <code class="bg-amber-100 px-1 rounded">{{ apiBase }}</code>
+        </p>
+      </div>
+
       <!-- Search Section -->
       <SearchBar :loading="loading" @search="handleSearch" />
 
@@ -92,6 +117,17 @@ const handleClusterClick = (clusterId: number | null) => {
           >
             Clear filter
           </button>
+        </div>
+
+        <div
+          v-if="results.results.length === 0"
+          class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 text-sm"
+        >
+          <p class="font-medium">Search ran successfully but returned no documents</p>
+          <p class="mt-1">
+            The index is probably empty. Run ingestion against the same Zilliz +
+            Postgres (or SQLite) your Render service uses, then search again.
+          </p>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
