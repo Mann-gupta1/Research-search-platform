@@ -114,7 +114,10 @@ def ingest_papers():
 
     embedding_service = EmbeddingService(settings.embedding_model)
     milvus_client = MilvusClient()
-    metadata_store = MetadataStore(settings.sqlite_db_path)
+    metadata_store = MetadataStore(
+        settings.sqlite_db_path,
+        database_url=settings.database_url,
+    )
 
     try:
         for start in range(0, len(papers), BATCH_SIZE):

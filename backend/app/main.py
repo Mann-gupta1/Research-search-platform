@@ -14,7 +14,10 @@ from app.config import settings
 async def lifespan(app: FastAPI):
     app.state.embedding_service = EmbeddingService(settings.embedding_model)
     app.state.milvus_client = MilvusClient()
-    app.state.metadata_store = MetadataStore(settings.sqlite_db_path)
+    app.state.metadata_store = MetadataStore(
+        settings.sqlite_db_path,
+        database_url=settings.database_url,
+    )
     yield
     app.state.milvus_client.close()
     app.state.metadata_store.close()
