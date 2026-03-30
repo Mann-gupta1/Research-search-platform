@@ -12,7 +12,10 @@ from app.config import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.embedding_service = EmbeddingService(settings.embedding_model)
+    # Defer model load until first /api/search — avoids OOM + port-scan timeout on 512MB hosts
+    app.state.embedding_service = EmbeddingService(
+        settings.embedding_model, eager=False
+    )
     app.state.milvus_client = MilvusClient()
     app.state.metadata_store = MetadataStore(
         settings.sqlite_db_path,

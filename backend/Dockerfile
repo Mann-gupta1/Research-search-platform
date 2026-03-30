@@ -1,5 +1,10 @@
 FROM python:3.11-slim
 
+ENV OMP_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
+ENV TOKENIZERS_PARALLELISM=false
+ENV TORCH_NUM_THREADS=1
+
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
