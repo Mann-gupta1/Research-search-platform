@@ -34,7 +34,9 @@ async def lifespan(app: FastAPI):
         settings.sqlite_db_path,
         database_url=settings.database_url,
     )
-    if os.getenv("WARM_EMBEDDING_ON_STARTUP", "1").lower() in ("1", "true", "yes"):
+    # Default off: background load + Milvus/DB often exceeds Render free 512MB → OOM → 502.
+    # Set WARM_EMBEDDING_ON_STARTUP=1 on instances with ≥1GB RAM if you want faster first search.
+    if os.getenv("WARM_EMBEDDING_ON_STARTUP", "0").lower() in ("1", "true", "yes"):
         threading.Thread(
             target=_warm_embedding,
             args=(app,),
@@ -71,8 +73,10 @@ async def root():
     return {
         "service": "research-search-platform",
         "health": "/api/health",
+        "ready": "/api/ready",
         "search": "POST /api/search",
         "docs": "/docs",
+        "note": "First search may take 1–3 min on cold start; use POST with JSON or upgrade RAM.",
     }
 
 
