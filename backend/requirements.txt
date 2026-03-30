@@ -12,4 +12,5 @@ psycopg2-binary==2.9.9
 python-dotenv==1.0.1
 pytest==8.2.2
 setuptools<82
-marshmallow<4
+environs==9.5.0
+marshmallow==3.21.2
