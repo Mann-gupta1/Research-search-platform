@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import health, search
@@ -43,3 +43,19 @@ app.add_middleware(
 
 app.include_router(health.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
+
+
+@app.get("/")
+async def root():
+    """Render and load balancers often probe GET /; API lives under /api."""
+    return {
+        "service": "research-search-platform",
+        "health": "/api/health",
+        "search": "POST /api/search",
+        "docs": "/docs",
+    }
+
+
+@app.head("/")
+async def root_head():
+    return Response(status_code=200)
