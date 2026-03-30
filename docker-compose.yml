@@ -91,7 +91,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NUXT_PUBLIC_API_BASE: http://backend:8000
+      # Browser calls the API via the host-mapped port, not the Docker service name
+      NUXT_PUBLIC_API_BASE: http://localhost:8000
     depends_on:
       backend:
         condition: service_healthy

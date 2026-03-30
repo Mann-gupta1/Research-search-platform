@@ -17,16 +17,23 @@ logger = logging.getLogger(__name__)
 
 class MilvusClient:
     def __init__(self):
-        connections.connect(
-            alias="default",
-            host=settings.milvus_host,
-            port=settings.milvus_port,
-        )
-        logger.info(
-            "Connected to Milvus at %s:%s",
-            settings.milvus_host,
-            settings.milvus_port,
-        )
+        if settings.milvus_uri:
+            kwargs: dict = {"alias": "default", "uri": settings.milvus_uri}
+            if settings.milvus_token:
+                kwargs["token"] = settings.milvus_token
+            connections.connect(**kwargs)
+            logger.info("Connected to Milvus (URI): %s", settings.milvus_uri)
+        else:
+            connections.connect(
+                alias="default",
+                host=settings.milvus_host,
+                port=settings.milvus_port,
+            )
+            logger.info(
+                "Connected to Milvus at %s:%s",
+                settings.milvus_host,
+                settings.milvus_port,
+            )
         self._ensure_collection()
 
     def _ensure_collection(self):
