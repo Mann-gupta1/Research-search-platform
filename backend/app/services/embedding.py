@@ -9,9 +9,9 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# Feature-extraction pipeline (same 384-dim vectors as local all-MiniLM-L6-v2)
+# HF Inference via Router (api-inference.huggingface.co returns 410 Gone — deprecated)
 _DEFAULT_HF_INFERENCE_URL = (
-    "https://api-inference.huggingface.co/pipeline/feature-extraction/"
+    "https://router.huggingface.co/hf-inference/models/"
     "sentence-transformers/all-MiniLM-L6-v2"
 )
 
@@ -151,6 +151,13 @@ class EmbeddingService:
                 time.sleep(10 * (attempt + 1))
                 logger.warning("HF API 503 — model loading, retry %s", attempt + 1)
                 continue
+            if r.status_code == 410:
+                raise RuntimeError(
+                    "HF API 410: api-inference.huggingface.co is deprecated. "
+                    "Set HF_INFERENCE_URL to https://router.huggingface.co/hf-inference/models/"
+                    "<your-model> (see embedding.py default). "
+                    + r.text[:400]
+                )
             if r.status_code >= 400:
                 raise RuntimeError(f"HF API {r.status_code}: {r.text[:800]}")
             try:
