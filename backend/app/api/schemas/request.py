@@ -7,8 +7,9 @@ from pydantic import BaseModel, Field, model_validator
 class SearchRequest(BaseModel):
     query: str = Field(
         default="",
+        min_length=0,
         max_length=10000,
-        description="Natural language search query (omit or empty when browse=true)",
+        description="Natural language search query (empty allowed when browse=true)",
     )
     browse: bool = Field(
         default=False,
