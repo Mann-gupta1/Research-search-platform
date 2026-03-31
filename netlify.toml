@@ -1,0 +1,7 @@
+# Browser calls same-origin /api/* → Netlify proxies to FastAPI on Render (avoids baking
+# NUXT_PUBLIC_API_BASE into the build). Change the URL if your backend host differs.
+[[redirects]]
+  from = "/api/*"
+  to = "https://research-search-platform.onrender.com/api/:splat"
+  status = 200
+  force = true

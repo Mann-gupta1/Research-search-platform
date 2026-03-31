@@ -16,11 +16,16 @@ function formatSearchError(e: unknown, apiBase: string): string {
   }
   if (e instanceof Error) {
     if (e.message.includes("Failed to fetch") || e.name === "FetchError") {
-      return `Cannot reach API at ${apiBase}. On Netlify set NUXT_PUBLIC_API_BASE to your Render URL (https://...) and redeploy.`;
+      return `Cannot reach API at ${apiBase}. Deploy with repo root netlify.toml (proxies /api to Render), or set NUXT_PUBLIC_API_BASE to your Render URL and redeploy.`;
     }
     return e.message;
   }
   return "Search failed";
+}
+
+function searchEndpoint(apiBase: string): string {
+  const root = String(apiBase || "").replace(/\/$/, "");
+  return root ? `${root}/api/search` : "/api/search";
 }
 
 export const useSearch = () => {
@@ -48,7 +53,7 @@ export const useSearch = () => {
         body.min_citations = request.min_citations;
       if (request.tags && request.tags.length > 0) body.tags = request.tags;
 
-      const data = await $fetch<SearchResponse>(`${apiBase}/api/search`, {
+      const data = await $fetch<SearchResponse>(searchEndpoint(apiBase), {
         method: "POST",
         body,
         timeout: SEARCH_TIMEOUT_MS,
@@ -56,7 +61,7 @@ export const useSearch = () => {
 
       results.value = data;
     } catch (e: unknown) {
-      error.value = formatSearchError(e, apiBase);
+      error.value = formatSearchError(e, String(apiBase || "(same-origin /api)"));
       console.error("Search error:", e);
     } finally {
       loading.value = false;

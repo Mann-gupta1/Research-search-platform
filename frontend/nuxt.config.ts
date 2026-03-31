@@ -5,7 +5,11 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || "http://localhost:8000",
+      // Dev: talk to local FastAPI. Prod build: empty → same-origin /api/* (use Netlify/Vercel
+      // proxy to Render — see netlify.toml). Override anytime with NUXT_PUBLIC_API_BASE.
+      apiBase:
+        process.env.NUXT_PUBLIC_API_BASE ??
+        (process.env.NODE_ENV === "production" ? "" : "http://localhost:8000"),
     },
   },
 

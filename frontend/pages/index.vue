@@ -4,9 +4,13 @@ import type { SearchRequest } from "~/types";
 const config = useRuntimeConfig();
 const apiBase = computed(() => String(config.public.apiBase || ""));
 
+/** True when the UI is clearly pointed at a dev machine, not prod proxy / Render. */
 const apiLooksLocal = computed(() => {
   const b = apiBase.value.toLowerCase();
-  return b.includes("localhost") || b.includes("127.0.0.1");
+  return (
+    Boolean(b) &&
+    (b.includes("localhost") || b.includes("127.0.0.1"))
+  );
 });
 
 const { results, loading, error, search } = useSearch();
@@ -80,12 +84,15 @@ const handleClusterClick = (clusterId: number | null) => {
       >
         <p class="font-medium">API URL is still set to localhost</p>
         <p class="mt-1">
-          In Netlify → Site settings → Environment variables, set
+          Either add
+          <code class="bg-amber-100 px-1 rounded">netlify.toml</code>
+          from this repo (proxies
+          <code class="bg-amber-100 px-1 rounded">/api/*</code>
+          to Render) and redeploy with no
+          <code class="bg-amber-100 px-1 rounded">NUXT_PUBLIC_API_BASE</code
+          >, or set
           <code class="bg-amber-100 px-1 rounded">NUXT_PUBLIC_API_BASE</code>
-          to your Render backend (e.g.
-          <code class="bg-amber-100 px-1 rounded"
-            >https://research-search-platform.onrender.com</code
-          >), then trigger a new deploy. Current value:
+          to your Render URL and redeploy. Current value:
           <code class="bg-amber-100 px-1 rounded">{{ apiBase }}</code>
         </p>
       </div>

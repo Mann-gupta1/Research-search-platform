@@ -12,10 +12,9 @@ export function useEmbeddingWarmup(
     if (apiLooksLocal.value) {
       return;
     }
-    const base = apiBase.value.replace(/\/$/, "");
-    if (!base) {
-      return;
-    }
+    const root = apiBase.value.replace(/\/$/, "");
+    const readyUrl = root ? `${root}/api/ready` : "/api/ready";
+    const warmUrl = root ? `${root}/api/warm` : "/api/warm";
 
     embeddingReady.value = false;
     warmupMessage.value = "Connecting to search API…";
@@ -25,10 +24,9 @@ export function useEmbeddingWarmup(
     const maxWaitMs = 20 * 60 * 1000;
 
     try {
-      const first = await $fetch<{ embedding_ready: boolean }>(
-        `${base}/api/ready`,
-        { timeout: longTimeout },
-      );
+      const first = await $fetch<{ embedding_ready: boolean }>(readyUrl, {
+        timeout: longTimeout,
+      });
       if (first.embedding_ready) {
         embeddingReady.value = true;
         warmupMessage.value = null;
@@ -38,7 +36,7 @@ export function useEmbeddingWarmup(
       warmupMessage.value =
         "Loading the AI model (first visit can take several minutes on small servers)…";
 
-      await $fetch(`${base}/api/warm`, {
+      await $fetch(warmUrl, {
         method: "POST",
         timeout: 60_000,
       });
@@ -46,10 +44,9 @@ export function useEmbeddingWarmup(
       const deadline = Date.now() + maxWaitMs;
       while (Date.now() < deadline) {
         await new Promise((r) => setTimeout(r, pollIntervalMs));
-        const r = await $fetch<{ embedding_ready: boolean }>(
-          `${base}/api/ready`,
-          { timeout: longTimeout },
-        );
+        const r = await $fetch<{ embedding_ready: boolean }>(readyUrl, {
+          timeout: longTimeout,
+        });
         if (r.embedding_ready) {
           embeddingReady.value = true;
           warmupMessage.value = null;
