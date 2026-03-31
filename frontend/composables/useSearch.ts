@@ -42,10 +42,14 @@ export const useSearch = () => {
 
     try {
       const body: Record<string, unknown> = {
-        query: request.query,
+        query: request.query ?? "",
         doc_type: request.doc_type,
         limit: request.limit,
       };
+
+      if (request.browse === true) {
+        body.browse = true;
+      }
 
       if (request.date_from) body.date_from = request.date_from;
       if (request.date_to) body.date_to = request.date_to;

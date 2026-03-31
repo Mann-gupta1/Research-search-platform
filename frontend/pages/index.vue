@@ -21,6 +21,10 @@ const { embeddingReady, warmupMessage, warmupError } = useEmbeddingWarmup(
 );
 
 const activeCluster = ref<number | null>(null);
+/** True after the user runs a semantic search (non-browse). */
+const didSemanticSearch = ref(false);
+/** True when the list is the landing “recent docs” browse, not vector search. */
+const showingBrowseSamples = ref(true);
 
 const filteredResults = computed(() => {
   if (!results.value) return [];
@@ -30,15 +34,45 @@ const filteredResults = computed(() => {
   );
 });
 
+const loadBrowseSamples = async (
+  docType: "patents" | "papers" | "both" = "both",
+) => {
+  activeCluster.value = null;
+  showingBrowseSamples.value = true;
+  await search({
+    query: "",
+    browse: true,
+    doc_type: docType,
+    limit: 5,
+  });
+};
+
 const handleSearch = async (request: SearchRequest) => {
   activeCluster.value = null;
+  if (request.browse === true) {
+    showingBrowseSamples.value = true;
+  } else if (request.query.trim()) {
+    didSemanticSearch.value = true;
+    showingBrowseSamples.value = false;
+  }
   await search(request);
+};
+
+const handleDocTypeChange = async (
+  docType: "patents" | "papers" | "both",
+) => {
+  if (didSemanticSearch.value) return;
+  await loadBrowseSamples(docType);
 };
 
 const handleClusterClick = (clusterId: number | null) => {
   activeCluster.value =
     activeCluster.value === clusterId ? null : clusterId;
 };
+
+onMounted(() => {
+  loadBrowseSamples("both");
+});
 </script>
 
 <template>
@@ -115,6 +149,7 @@ const handleClusterClick = (clusterId: number | null) => {
         :loading="loading"
         :engine-ready="embeddingReady"
         @search="handleSearch"
+        @doc-type-change="handleDocTypeChange"
       />
 
       <!-- Error -->
@@ -130,11 +165,21 @@ const handleClusterClick = (clusterId: number | null) => {
         <!-- Stats bar -->
         <div class="flex items-center justify-between mb-4">
           <p class="text-sm text-gray-600">
-            <span class="font-semibold">{{ results.results.length }}</span>
-            results found in
-            <span class="font-semibold"
-              >{{ results.total_time_ms.toFixed(0) }}ms</span
-            >
+            <template v-if="showingBrowseSamples">
+              Showing
+              <span class="font-semibold">{{ results.results.length }}</span>
+              recent documents (up to 5) ·
+              <span class="font-semibold"
+                >{{ results.total_time_ms.toFixed(0) }}ms</span
+              >
+            </template>
+            <template v-else>
+              <span class="font-semibold">{{ results.results.length }}</span>
+              results in
+              <span class="font-semibold"
+                >{{ results.total_time_ms.toFixed(0) }}ms</span
+              >
+            </template>
             <span v-if="activeCluster !== null" class="ml-2 text-primary-600">
               (filtered to cluster)
             </span>
@@ -177,9 +222,39 @@ const handleClusterClick = (clusterId: number | null) => {
         </div>
       </div>
 
-      <!-- Empty state -->
+      <!-- Initial browse in flight -->
       <div
-        v-else-if="!loading"
+        v-else-if="loading"
+        class="mt-16 text-center text-gray-500"
+      >
+        <svg
+          class="animate-spin w-10 h-10 mx-auto mb-3 text-primary-500"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            class="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-width="4"
+          />
+          <path
+            class="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+          />
+        </svg>
+        <p class="text-lg font-medium text-gray-700">Loading recent documents…</p>
+        <p class="text-sm mt-1 text-gray-400">
+          No query needed — we show a sample of the index first
+        </p>
+      </div>
+
+      <!-- No results yet and not loading (e.g. cleared) -->
+      <div
+        v-else
         class="mt-20 text-center text-gray-400"
       >
         <svg
@@ -195,9 +270,9 @@ const handleClusterClick = (clusterId: number | null) => {
             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
           />
         </svg>
-        <p class="text-lg font-medium">Enter a technical query to begin</p>
+        <p class="text-lg font-medium">Enter a technical query to search</p>
         <p class="text-sm mt-1">
-          Search across patents and research papers using natural language
+          Semantic search across patents and research papers
         </p>
       </div>
     </main>

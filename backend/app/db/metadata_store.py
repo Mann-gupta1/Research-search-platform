@@ -164,6 +164,59 @@ class MetadataStore:
         cursor = self.conn.execute("SELECT COUNT(*) FROM documents")
         return cursor.fetchone()[0]
 
+    def list_browse(
+        self,
+        limit: int,
+        doc_type: str = "both",
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        min_citations: Optional[int] = None,
+        tags: Optional[list[str]] = None,
+    ) -> list[dict]:
+        """
+        Recent documents for landing / browse mode (no vector search).
+        Ordered by publication_date descending.
+        """
+        q = "SELECT * FROM documents WHERE 1=1"
+        params: list = []
+        ph = "%s" if self.is_postgres else "?"
+
+        if doc_type == "patents":
+            q += f" AND doc_type = {ph}"
+            params.append("patent")
+        elif doc_type == "papers":
+            q += f" AND doc_type = {ph}"
+            params.append("paper")
+
+        if date_from:
+            q += f" AND publication_date >= {ph}"
+            params.append(date_from)
+        if date_to:
+            q += f" AND publication_date <= {ph}"
+            params.append(date_to)
+        if min_citations is not None:
+            q += f" AND citation_count >= {ph}"
+            params.append(min_citations)
+        if tags:
+            tag_clauses = " OR ".join(f"tags LIKE {ph}" for _ in tags)
+            q += f" AND ({tag_clauses})"
+            params.extend(f"%{tag}%" for tag in tags)
+
+        if self.is_postgres:
+            q += " ORDER BY publication_date DESC NULLS LAST, doc_id LIMIT %s"
+        else:
+            q += (
+                " ORDER BY publication_date IS NULL, publication_date DESC, doc_id LIMIT ?"
+            )
+        params.append(limit)
+
+        if self.is_postgres:
+            with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                cursor.execute(q, params)
+                return [dict(row) for row in cursor.fetchall()]
+        cursor = self.conn.execute(q, params)
+        return [dict(row) for row in cursor.fetchall()]
+
     def close(self):
         self.conn.close()
         logger.info("MetadataStore connection closed")

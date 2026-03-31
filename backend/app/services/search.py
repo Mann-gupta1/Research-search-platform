@@ -168,6 +168,110 @@ class SearchService:
             total_time_ms=round(elapsed, 2),
         )
 
+    def browse(
+        self,
+        doc_type: str = "both",
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        min_citations: Optional[int] = None,
+        tags: Optional[list[str]] = None,
+        limit: int = 5,
+    ) -> SearchResponse:
+        """Recent documents from DB + Milvus vectors for clustering (no embedding API call)."""
+        start_time = time.time()
+        rows = self.metadata_store.list_browse(
+            limit=limit,
+            doc_type=doc_type,
+            date_from=date_from,
+            date_to=date_to,
+            min_citations=min_citations,
+            tags=tags,
+        )
+        if not rows:
+            return self._empty_response(start_time)
+
+        results = []
+        for meta in rows:
+            doc_id = meta["doc_id"]
+            t = meta.get("tags", "[]")
+            if isinstance(t, str):
+                try:
+                    tag_list = json.loads(t)
+                except (json.JSONDecodeError, TypeError):
+                    tag_list = []
+            else:
+                tag_list = t or []
+
+            results.append(
+                DocumentResult(
+                    doc_id=doc_id,
+                    title=meta["title"],
+                    abstract=meta["abstract"],
+                    doc_type=meta["doc_type"],
+                    publication_date=meta.get("publication_date"),
+                    citation_count=meta.get("citation_count", 0),
+                    tags=tag_list,
+                    score=1.0,
+                )
+            )
+
+        result_doc_ids = [r.doc_id for r in results]
+        vectors_map = self.milvus_client.get_vectors_by_ids(result_doc_ids)
+
+        ordered_embeddings = []
+        ordered_abstracts = []
+        valid_results = []
+        for r in results:
+            if r.doc_id in vectors_map:
+                ordered_embeddings.append(vectors_map[r.doc_id])
+                ordered_abstracts.append(r.abstract)
+                valid_results.append(r)
+
+        results = valid_results
+
+        if ordered_embeddings:
+            emb_array = np.array(ordered_embeddings, dtype=np.float32)
+            cluster_labels, cluster_info = self.clustering_service.assign_labels(
+                emb_array, ordered_abstracts
+            )
+
+            for i, r in enumerate(results):
+                r.cluster_id = cluster_labels[i]
+
+            pub_dates = [r.publication_date or "" for r in results]
+            trend_data = self.trend_service.compute_trends(
+                cluster_labels, cluster_info, pub_dates
+            )
+        else:
+            cluster_info = []
+            trend_data = {"cells": [], "sub_topics": [], "years": [], "velocities": {}}
+
+        clusters = [
+            SubTopic(
+                cluster_id=ci["cluster_id"],
+                label=ci["label"],
+                keywords=ci["keywords"],
+                doc_count=len(ci["doc_indices"]),
+            )
+            for ci in cluster_info
+        ]
+
+        heatmap = HeatmapData(
+            cells=[HeatmapCell(**c) for c in trend_data["cells"]],
+            sub_topics=trend_data["sub_topics"],
+            years=trend_data["years"],
+            velocities=trend_data["velocities"],
+        )
+
+        elapsed = (time.time() - start_time) * 1000
+
+        return SearchResponse(
+            results=results,
+            clusters=clusters,
+            heatmap=heatmap,
+            total_time_ms=round(elapsed, 2),
+        )
+
     def _empty_response(self, start_time: float) -> SearchResponse:
         elapsed = (time.time() - start_time) * 1000
         return SearchResponse(

@@ -18,6 +18,11 @@ async def search_get_help():
             "doc_type": "both",
             "limit": 10,
         },
+        "browse_example": {
+            "browse": True,
+            "doc_type": "both",
+            "limit": 5,
+        },
     }
 
 
@@ -29,14 +34,24 @@ async def search_documents(request: Request, body: SearchRequest):
         metadata_store=request.app.state.metadata_store,
     )
 
-    response = search_service.search(
-        query=body.query,
-        doc_type=body.doc_type,
-        date_from=str(body.date_from) if body.date_from else None,
-        date_to=str(body.date_to) if body.date_to else None,
-        min_citations=body.min_citations,
-        tags=body.tags,
-        limit=body.limit,
-    )
+    if body.browse:
+        response = search_service.browse(
+            doc_type=body.doc_type,
+            date_from=str(body.date_from) if body.date_from else None,
+            date_to=str(body.date_to) if body.date_to else None,
+            min_citations=body.min_citations,
+            tags=body.tags,
+            limit=body.limit,
+        )
+    else:
+        response = search_service.search(
+            query=body.query.strip(),
+            doc_type=body.doc_type,
+            date_from=str(body.date_from) if body.date_from else None,
+            date_to=str(body.date_to) if body.date_to else None,
+            min_citations=body.min_citations,
+            tags=body.tags,
+            limit=body.limit,
+        )
 
     return response

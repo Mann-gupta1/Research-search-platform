@@ -11,6 +11,8 @@ const engineOk = computed(() => props.engineReady !== false);
 
 const emit = defineEmits<{
   search: [request: SearchRequest];
+  /** Fired when All / Patents / Papers changes (parent can refresh browse samples). */
+  "doc-type-change": [docType: "patents" | "papers" | "both"];
 }>();
 
 const query = ref("");
@@ -43,6 +45,11 @@ const handleSubmit = () => {
 
   emit("search", request);
 };
+
+function setDocType(v: "patents" | "papers" | "both") {
+  docType.value = v;
+  emit("doc-type-change", v);
+}
 </script>
 
 <template>
@@ -120,7 +127,7 @@ const handleSubmit = () => {
                 ? 'bg-white text-primary-700 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900',
             ]"
-            @click="docType = option.value as 'both' | 'patents' | 'papers'"
+            @click="setDocType(option.value as 'both' | 'patents' | 'papers')"
           >
             {{ option.label }}
           </button>
