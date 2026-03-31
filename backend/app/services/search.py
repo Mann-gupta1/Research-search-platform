@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import time
 from typing import Optional
 
@@ -46,14 +47,23 @@ class SearchService:
         limit: int = 50,
     ) -> SearchResponse:
         start_time = time.time()
+        _dbg = os.getenv("SEARCH_DEBUG", "").lower() in ("1", "true", "yes")
 
-        query_vector = self.embedding_service.encode_query(query).tolist()
+        try:
+            query_vector = self.embedding_service.encode_query(query).tolist()
+            if _dbg:
+                logger.info("SEARCH_DEBUG: embedding OK len=%s", len(query_vector))
 
-        milvus_hits = self.milvus_client.search(
-            query_vector=query_vector,
-            top_k=min(limit * 2, 200),
-            doc_type_filter=doc_type,
-        )
+            milvus_hits = self.milvus_client.search(
+                query_vector=query_vector,
+                top_k=min(limit * 2, 200),
+                doc_type_filter=doc_type,
+            )
+            if _dbg:
+                logger.info("SEARCH_DEBUG: Milvus OK n_hits=%s", len(milvus_hits))
+        except Exception:
+            logger.exception("Search failed during embedding or Milvus search")
+            raise
 
         if not milvus_hits:
             return self._empty_response(start_time)

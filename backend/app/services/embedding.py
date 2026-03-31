@@ -26,6 +26,11 @@ def _l2_normalize(v: np.ndarray) -> np.ndarray:
 def _raw_to_vector(raw: Any) -> np.ndarray:
     """HF feature-extraction: [seq, dim] token embeddings or [dim] vector."""
     arr = np.asarray(raw, dtype=np.float32)
+    if arr.ndim == 3:
+        if arr.shape[0] == 1:
+            arr = arr[0]
+        else:
+            arr = arr.mean(axis=0)
     if arr.ndim == 2:
         return arr.mean(axis=0).astype(np.float32)
     if arr.ndim == 1:
@@ -33,27 +38,47 @@ def _raw_to_vector(raw: Any) -> np.ndarray:
     raise ValueError(f"Unexpected embedding array shape: {arr.shape}")
 
 
-def _parse_hf_json(data: Any) -> np.ndarray:
-    """
-    Normalize HF Inference responses:
-    - single sequence: [[tok, tok, ...]] or [tok, tok, ...]
-    - sometimes double-nested: [[ [...384 floats...] ]]
-    """
+def _validate_hf_response(data: Any) -> None:
+    """HF sometimes returns {'error': '...'} instead of a vector."""
+    if isinstance(data, dict):
+        err = data.get("error") or data.get("message") or data
+        raise RuntimeError(f"Hugging Face API error object: {err}")
     if data is None:
         raise ValueError("Empty response from Hugging Face API")
 
-    if isinstance(data, list) and len(data) > 0:
-        el0 = data[0]
-        if isinstance(el0, (int, float)):
-            return _raw_to_vector(data)
-        if isinstance(el0, list):
-            inner = el0[0] if len(el0) > 0 else None
-            if isinstance(inner, (int, float)):
-                return _raw_to_vector(data)
-            # list of token rows
-            return _raw_to_vector(data)
 
-    raise ValueError("Unrecognized Hugging Face embedding JSON shape")
+def _peel_nested_list_wrapper(data: Any) -> Any:
+    """
+    HF sometimes returns [[v1,...,v384]] instead of [v1,...,v384].
+    Peel only when: one outer element, inner is a flat numeric vector (not token rows).
+    Token matrices: [[row],[row],...] — inner[0] is a list of floats (one token) but
+    len(data[0])>1 rows → do not peel here; _raw_to_vector mean-pools.
+    """
+    if not isinstance(data, list) or len(data) != 1:
+        return data
+    inner = data[0]
+    if not isinstance(inner, list) or len(inner) == 0:
+        return data
+    if not isinstance(inner[0], (int, float)):
+        return data
+    arr = np.asarray(inner, dtype=np.float32)
+    if arr.ndim == 1:
+        return inner
+    return data
+
+
+def _parse_hf_json(data: Any) -> np.ndarray:
+    """
+    Normalize HF Inference responses (feature-extraction / models API).
+    Handles error JSON, nested lists, token matrices [seq, dim], and plain [dim].
+    """
+    _validate_hf_response(data)
+    cur = _peel_nested_list_wrapper(data)
+    try:
+        return _raw_to_vector(cur)
+    except Exception as e:
+        preview = repr(data)[:400] if not isinstance(data, dict) else str(data)[:400]
+        raise ValueError(f"Could not parse HF embedding: {e}; preview={preview}") from e
 
 
 class EmbeddingService:
@@ -128,7 +153,12 @@ class EmbeddingService:
                 continue
             if r.status_code >= 400:
                 raise RuntimeError(f"HF API {r.status_code}: {r.text[:800]}")
-            return r.json()
+            try:
+                data = r.json()
+            except ValueError as e:
+                raise RuntimeError(f"HF API non-JSON body: {last_txt[:500]}") from e
+            _validate_hf_response(data)
+            return data
         raise RuntimeError(f"HF API failed after retries: {last_txt[:500]}")
 
     def _hf_embed_single(self, text: str) -> np.ndarray:
@@ -136,11 +166,12 @@ class EmbeddingService:
         vec = _parse_hf_json(data)
         out = _l2_normalize(vec)
         if out.shape[0] != self._expected_dim:
-            logger.warning(
-                "Embedding dim %s != expected %s — check model / Milvus schema",
-                out.shape[0],
-                self._expected_dim,
+            raise ValueError(
+                f"Embedding length {out.shape[0]} != expected {self._expected_dim} "
+                "(Milvus collection dim); check HF model / HF_INFERENCE_URL"
             )
+        if os.getenv("HF_EMBED_DEBUG", "").lower() in ("1", "true", "yes"):
+            logger.info("HF embedding OK: len=%s", int(out.shape[0]))
         return out
 
     def _hf_embed_chunk(self, texts: list[str]) -> np.ndarray:
@@ -225,7 +256,12 @@ class EmbeddingService:
     def encode_query(self, query: str) -> np.ndarray:
         if self._use_hf:
             return self._hf_embed_single(query)
-        return self.encode([query])[0]
+        v = self.encode([query])[0]
+        if v.shape[0] != self._expected_dim:
+            raise ValueError(
+                f"Query embedding length {v.shape[0]} != expected {self._expected_dim}"
+            )
+        return v
 
     def warm(self) -> None:
         if self._use_hf:
