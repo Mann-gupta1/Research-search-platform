@@ -27,7 +27,11 @@ def _warm_embedding(app: FastAPI) -> None:
 async def lifespan(app: FastAPI):
     # Defer model load until warm-up thread or first /api/search — keeps port binding fast on Render
     app.state.embedding_service = EmbeddingService(
-        settings.embedding_model, eager=False
+        settings.embedding_model,
+        eager=False,
+        hf_token=settings.huggingfacehub_api_token,
+        embedding_backend=settings.embedding_backend,
+        hf_inference_url=settings.hf_inference_url,
     )
     app.state.milvus_client = MilvusClient()
     app.state.metadata_store = MetadataStore(
@@ -69,15 +73,13 @@ app.include_router(search.router, prefix="/api")
 
 @app.get("/")
 async def root():
-    """Render and load balancers often probe GET /; API lives under /api."""
     return {
         "service": "research-search-platform",
         "health": "/api/health",
         "ready": "/api/ready",
-        "warm": "POST /api/warm (load model in background; then poll /api/ready)",
+        "warm": "POST /api/warm",
         "search": "POST /api/search",
         "docs": "/docs",
-        "note": "First search may take 1–3 min on cold start; use POST with JSON or upgrade RAM.",
     }
 
 

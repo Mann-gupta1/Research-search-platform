@@ -1,6 +1,5 @@
 import type { SearchRequest, SearchResponse } from "~/types";
 
-/** Render cold start + first embedding load can exceed 60s */
 const SEARCH_TIMEOUT_MS = 180_000;
 
 function formatSearchError(e: unknown, apiBase: string): string {
@@ -64,16 +63,10 @@ export const useSearch = () => {
     }
   };
 
-  const reset = () => {
-    results.value = null;
-    error.value = null;
-  };
-
   return {
     results,
     loading,
     error,
     search,
-    reset,
   };
 };

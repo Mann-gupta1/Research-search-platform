@@ -9,7 +9,7 @@ const apiLooksLocal = computed(() => {
   return b.includes("localhost") || b.includes("127.0.0.1");
 });
 
-const { results, loading, error, search, reset } = useSearch();
+const { results, loading, error, search } = useSearch();
 
 const { embeddingReady, warmupMessage, warmupError } = useEmbeddingWarmup(
   apiBase,

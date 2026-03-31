@@ -1,9 +1,5 @@
 import type { Ref } from "vue";
 
-/**
- * On production, loads the embedding model via POST /api/warm and polls GET /api/ready
- * so the first POST /api/search does not time out or 502 (model load + search in one request).
- */
 export function useEmbeddingWarmup(
   apiBase: Ref<string>,
   apiLooksLocal: Ref<boolean>,

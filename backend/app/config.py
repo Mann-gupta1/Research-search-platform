@@ -13,6 +13,14 @@ class Settings(BaseSettings):
     embedding_model: str = os.getenv(
         "EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
     )
+    # Hugging Face Inference API (no local PyTorch) — set HUGGINGFACEHUB_API_TOKEN
+    huggingfacehub_api_token: str | None = (
+        os.getenv("HUGGINGFACEHUB_API_TOKEN") or os.getenv("HF_TOKEN")
+    )
+    # auto: use HF API if token set, else local SentenceTransformer | hf | local
+    embedding_backend: str = os.getenv("EMBEDDING_BACKEND", "auto")
+    # Optional override; default matches HF feature-extraction for MiniLM
+    hf_inference_url: str | None = os.getenv("HF_INFERENCE_URL")
     collection_name: str = "documents"
     embedding_dim: int = 384
     default_search_limit: int = 50

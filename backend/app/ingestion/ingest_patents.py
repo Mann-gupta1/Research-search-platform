@@ -91,7 +91,13 @@ def ingest_patents():
         logger.warning("No patents to ingest")
         return
 
-    embedding_service = EmbeddingService(settings.embedding_model)
+    embedding_service = EmbeddingService(
+        settings.embedding_model,
+        eager=True,
+        hf_token=settings.huggingfacehub_api_token,
+        embedding_backend=settings.embedding_backend,
+        hf_inference_url=settings.hf_inference_url,
+    )
     milvus_client = MilvusClient()
     metadata_store = MetadataStore(
         settings.sqlite_db_path,

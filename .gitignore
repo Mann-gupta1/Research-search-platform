@@ -12,4 +12,3 @@ backend/data/
 *.tsv.zip
 .DS_Store
 .pytest_cache/
-package-lock.json

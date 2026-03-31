@@ -159,7 +159,13 @@ def main() -> None:
         )
 
     logger.info("Embedding %d abstracts with %s ...", n, settings.embedding_model)
-    emb = EmbeddingService(settings.embedding_model, eager=True)
+    emb = EmbeddingService(
+        settings.embedding_model,
+        eager=True,
+        hf_token=settings.huggingfacehub_api_token,
+        embedding_backend=settings.embedding_backend,
+        hf_inference_url=settings.hf_inference_url,
+    )
     abstracts = [d["abstract"] for d in docs]
     vectors = emb.encode(abstracts)
 

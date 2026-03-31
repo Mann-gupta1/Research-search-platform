@@ -9,7 +9,6 @@ router = APIRouter()
 
 @router.get("/search")
 async def search_get_help():
-    """Browsers use GET; search requires POST + JSON (avoids 'broken' URL confusion)."""
     return {
         "message": "Use HTTP POST with Content-Type: application/json",
         "method": "POST",
