@@ -6,9 +6,16 @@ __pycache__/
 *.pyc
 *.pyo
 .env
+.env.*
+!.env.example
 *.db
 backend/data/
 *.tsv
 *.tsv.zip
 .DS_Store
+Thumbs.db
 .pytest_cache/
+.cursor/
+mcps/
+.vscode/
+*.log

@@ -116,7 +116,7 @@ def seeded_data(embedding_service, milvus_client, metadata_store):
 
     count = milvus_client.insert(doc_ids, doc_types, embeddings.tolist())
     metadata_store.insert_batch(SAMPLE_DOCS)
-    print(f"\nSeeded {count} documents into Milvus collection '{TEST_COLLECTION}'")
+    assert count == len(SAMPLE_DOCS)
     time.sleep(1)
     return True
 
@@ -124,7 +124,6 @@ def seeded_data(embedding_service, milvus_client, metadata_store):
 class TestMilvusEndToEnd:
     def test_milvus_connection(self, milvus_client):
         assert milvus_client.collection is not None
-        print(f"\nCollection: {milvus_client.collection.name}")
 
     def test_insert_and_search(self, seeded_data, embedding_service, milvus_client):
         query = "lithium battery thermal management"
@@ -132,9 +131,6 @@ class TestMilvusEndToEnd:
         results = milvus_client.search(query_vec, top_k=5)
 
         assert len(results) > 0
-        print(f"\n--- Milvus search results for '{query}' ---")
-        for r in results:
-            print(f"  [{r['score']:.4f}] {r['doc_id']} ({r['doc_type']})")
 
         assert results[0]["doc_id"] == "mtest_patent_001", \
             f"Expected thermal management patent as top hit, got {results[0]['doc_id']}"
@@ -157,7 +153,6 @@ class TestMilvusEndToEnd:
         vectors = milvus_client.get_vectors_by_ids(["mtest_patent_001", "mtest_paper_001"])
         assert len(vectors) == 2
         assert len(vectors["mtest_patent_001"]) == 384
-        print(f"\nRetrieved vectors for {len(vectors)} documents")
 
     def test_full_search_service(self, seeded_data, embedding_service, milvus_client, metadata_store):
         search_service = SearchService(
@@ -176,17 +171,8 @@ class TestMilvusEndToEnd:
         assert len(response.clusters) >= 1
         assert response.total_time_ms > 0
 
-        print(f"\n=== Full SearchService Response ===")
-        print(f"  Results: {len(response.results)}")
-        print(f"  Clusters: {len(response.clusters)}")
-        print(f"  Heatmap cells: {len(response.heatmap.cells)}")
-        print(f"  Time: {response.total_time_ms:.1f}ms")
-        for r in response.results:
-            print(f"  [{r.score:.3f}] {r.title} ({r.doc_type}) cluster={r.cluster_id}")
-
         json_out = response.model_dump_json()
         assert len(json_out) > 100
-        print(f"  JSON size: {len(json_out)} bytes")
 
     def test_search_with_date_filter(self, seeded_data, embedding_service, milvus_client, metadata_store):
         search_service = SearchService(
@@ -222,8 +208,3 @@ class TestMilvusEndToEnd:
         for r in response.results:
             assert r.citation_count >= 30, \
                 f"Citation filter failed: {r.citation_count}"
-        print(f"\n--- Citation filtered (>=30): {len(response.results)} results ---")
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-s"])

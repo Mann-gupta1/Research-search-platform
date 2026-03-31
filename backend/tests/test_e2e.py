@@ -150,10 +150,6 @@ class TestFullPipeline:
         assert "battery" in top_doc["abstract"].lower() or "lithium" in top_doc["abstract"].lower(), \
             f"Top result should be battery-related, got: {top_doc['title']}"
 
-        print("\n--- Similarity Ranking for 'lithium battery thermal management' ---")
-        for i, idx in enumerate(ranked_indices):
-            print(f"  {i+1}. [{scores[idx]:.4f}] {SAMPLE_DOCS[idx]['title']}")
-
     def test_doc_type_filtering(self, emb_service, doc_embeddings):
         query_vec = emb_service.encode_query("machine learning applications")
         scores = np.dot(doc_embeddings, query_vec)
@@ -177,16 +173,12 @@ class TestFullPipeline:
         results = metadata_store.get_filtered(all_ids, date_from="2023-01-01")
         for r in results:
             assert r["publication_date"] >= "2023-01-01"
-        print(f"\n--- Date filter (>=2023): {len(results)} docs ---")
-        for r in results:
-            print(f"  {r['doc_id']}: {r['publication_date']}")
 
     def test_metadata_citation_filter(self, metadata_store):
         all_ids = [d["doc_id"] for d in SAMPLE_DOCS]
         results = metadata_store.get_filtered(all_ids, min_citations=30)
         for r in results:
             assert r["citation_count"] >= 30
-        print(f"\n--- Citation filter (>=30): {len(results)} docs ---")
 
     def test_clustering(self, emb_service, doc_embeddings):
         clustering = ClusteringService(n_clusters=3)
@@ -196,13 +188,6 @@ class TestFullPipeline:
         assert len(labels) == len(SAMPLE_DOCS)
         assert len(cluster_info) >= 1
         assert all(isinstance(ci["label"], str) for ci in cluster_info)
-
-        print("\n--- Clustering Results ---")
-        for ci in cluster_info:
-            doc_titles = [SAMPLE_DOCS[idx]["title"] for idx in ci["doc_indices"]]
-            print(f"  Cluster {ci['cluster_id']}: '{ci['label']}'")
-            print(f"    Keywords: {ci['keywords'][:5]}")
-            print(f"    Docs: {doc_titles}")
 
     def test_trend_computation(self, emb_service, doc_embeddings):
         clustering = ClusteringService(n_clusters=3)
@@ -221,15 +206,6 @@ class TestFullPipeline:
         assert len(result["cells"]) > 0
         assert len(result["sub_topics"]) >= 1
         assert all(isinstance(v, float) for v in result["velocities"].values())
-
-        print("\n--- Trend/Heatmap Data ---")
-        print(f"  Sub-topics: {result['sub_topics']}")
-        print(f"  Years: {result['years']}")
-        print(f"  Velocities: {result['velocities']}")
-        print(f"  Heatmap cells ({len(result['cells'])}):")
-        for cell in result["cells"]:
-            if cell["count"] > 0:
-                print(f"    {cell['sub_topic']} | {cell['year']} | count={cell['count']}")
 
     def test_full_pipeline_response_structure(self, emb_service, doc_embeddings, metadata_store):
         """Simulates the full search response structure."""
@@ -311,21 +287,39 @@ class TestFullPipeline:
         assert "clusters" in response_dict
         assert "heatmap" in response_dict
 
-        print("\n=== Full Pipeline Response ===")
-        print(f"  Results: {len(response.results)} documents")
-        print(f"  Clusters: {len(response.clusters)}")
-        for c in response.clusters:
-            print(f"    - {c.label} ({c.doc_count} docs): {c.keywords[:3]}")
-        print(f"  Heatmap: {len(response.heatmap.cells)} cells, {len(response.heatmap.years)} years")
-        print(f"  Velocities: {response.heatmap.velocities}")
-        print(f"  Top 3 results:")
-        for r in response.results[:3]:
-            print(f"    [{r.score:.3f}] {r.title} ({r.doc_type})")
-
         json_str = response.model_dump_json()
         assert len(json_str) > 100
-        print(f"\n  JSON response size: {len(json_str)} bytes")
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-s"])
+class TestEmbeddingBasics:
+    def test_encode_single(self):
+        service = EmbeddingService()
+        vec = service.encode_query("lithium battery thermal management")
+        assert vec.shape == (384,)
+        assert np.isfinite(vec).all()
+
+    def test_encode_batch(self):
+        service = EmbeddingService()
+        texts = ["hello world", "machine learning", "battery technology"]
+        embeddings = service.encode(texts)
+        assert embeddings.shape == (3, 384)
+
+    def test_similar_queries_closer_than_unrelated(self):
+        service = EmbeddingService()
+        v1 = service.encode_query("lithium battery")
+        v2 = service.encode_query("lithium-ion battery cell")
+        v3 = service.encode_query("recipe for chocolate cake")
+        sim_related = float(np.dot(v1, v2))
+        sim_unrelated = float(np.dot(v1, v3))
+        assert sim_related > sim_unrelated
+
+
+class TestTrendEdgeCases:
+    def test_empty_dates(self):
+        trend_service = TrendService()
+        result = trend_service.compute_trends(
+            [0],
+            [{"cluster_id": 0, "label": "X", "keywords": [], "doc_indices": [0]}],
+            [""],
+        )
+        assert result["cells"] == []
