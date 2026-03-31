@@ -9,10 +9,11 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# HF Inference via Router (api-inference.huggingface.co returns 410 Gone — deprecated)
+# HF Inference via Router. Task path is required: bare /models/{id} maps to the wrong
+# pipeline (SentenceSimilarityPipeline → 400 "missing ... 'sentences'").
 _DEFAULT_HF_INFERENCE_URL = (
     "https://router.huggingface.co/hf-inference/models/"
-    "sentence-transformers/all-MiniLM-L6-v2"
+    "sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction"
 )
 
 
@@ -155,7 +156,7 @@ class EmbeddingService:
                 raise RuntimeError(
                     "HF API 410: api-inference.huggingface.co is deprecated. "
                     "Set HF_INFERENCE_URL to https://router.huggingface.co/hf-inference/models/"
-                    "<your-model> (see embedding.py default). "
+                    "<org>/<model>/pipeline/feature-extraction (see embedding.py default). "
                     + r.text[:400]
                 )
             if r.status_code >= 400:
